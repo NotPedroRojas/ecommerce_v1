@@ -1,7 +1,6 @@
-
 <?php
 
-require_once __DIR__ . "/../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 function obtenerOCrearCarrito() {
     global $conexion;
@@ -10,16 +9,35 @@ function obtenerOCrearCarrito() {
         session_start();
     }
 
-    if (!isset($_SESSION["identificadorCarrito"])) {
-        $_SESSION["identificadorCarrito"] = session_id();
+    if (isset($_SESSION["idUsuario"])) {
+
+        $idUsuario = (int) $_SESSION["idUsuario"];
+
+        $consulta = $conexion->prepare(
+            "SELECT idCarrito FROM carritos WHERE idUsuario = ?"
+        );
+        $consulta->execute([$idUsuario]);
+
+        $carrito = $consulta->fetch(PDO::FETCH_ASSOC);
+
+        if ($carrito) {
+            return $carrito["idCarrito"];
+        }
+
+        $consulta = $conexion->prepare(
+            "INSERT INTO carritos (idUsuario) VALUES (?)"
+        );
+        $consulta->execute([$idUsuario]);
+
+        return $conexion->lastInsertId();
     }
 
-    $identificador = $_SESSION["identificadorCarrito"];
+    $identificador = session_id();
 
     $consulta = $conexion->prepare(
-        "SELECT idCarrito FROM carritos WHERE identificadorSesion = ?"
+        "SELECT idCarrito FROM carritos
+         WHERE identificadorSesion = ? AND idUsuario IS NULL"
     );
-
     $consulta->execute([$identificador]);
 
     $carrito = $consulta->fetch(PDO::FETCH_ASSOC);
@@ -31,7 +49,6 @@ function obtenerOCrearCarrito() {
     $consulta = $conexion->prepare(
         "INSERT INTO carritos (identificadorSesion) VALUES (?)"
     );
-
     $consulta->execute([$identificador]);
 
     return $conexion->lastInsertId();
@@ -40,21 +57,17 @@ function obtenerOCrearCarrito() {
 
 function agregarProducto($idProducto) {
     global $conexion;
-
     $idProducto = (int) $idProducto;
-
     if ($idProducto <= 0) {
         return;
     }
-
-    // Comprobamos que el producto exista
     $consulta = $conexion->prepare(
-        "SELECT idProducto FROM productos WHERE idProducto = ?"
+        "SELECT idProducto, stock FROM productos WHERE idProducto = ?"
     );
-
     $consulta->execute([$idProducto]);
+    $producto = $consulta->fetch(PDO::FETCH_ASSOC);
 
-    if (!$consulta->fetch(PDO::FETCH_ASSOC)) {
+    if (!$producto || $producto["stock"] <= 0) {
         return;
     }
 
@@ -65,31 +78,25 @@ function agregarProducto($idProducto) {
          FROM items_carrito
          WHERE idCarrito = ? AND idProducto = ?"
     );
-
     $consulta->execute([$idCarrito, $idProducto]);
-
     $item = $consulta->fetch(PDO::FETCH_ASSOC);
 
     if ($item) {
         $nuevaCantidad = $item["cantidad"] + 1;
 
+        if ($nuevaCantidad > $producto["stock"]) {
+            return;
+        }
+
         $consulta = $conexion->prepare(
-            "UPDATE items_carrito
-             SET cantidad = ?
-             WHERE idItemCarrito = ?"
+            "UPDATE items_carrito SET cantidad = ? WHERE idItemCarrito = ?"
         );
-
-        $consulta->execute([
-            $nuevaCantidad,
-            $item["idItemCarrito"]
-        ]);
-
+        $consulta->execute([$nuevaCantidad, $item["idItemCarrito"]]);
     } else {
         $consulta = $conexion->prepare(
             "INSERT INTO items_carrito (idCarrito, idProducto, cantidad)
              VALUES (?, ?, 1)"
         );
-
         $consulta->execute([$idCarrito, $idProducto]);
     }
 }
@@ -97,7 +104,6 @@ function agregarProducto($idProducto) {
 
 function modificarCantidad($idProducto, $cambio) {
     global $conexion;
-
     $idProducto = (int) $idProducto;
     $cambio = (int) $cambio;
 
@@ -106,15 +112,15 @@ function modificarCantidad($idProducto, $cambio) {
     }
 
     $idCarrito = obtenerOCrearCarrito();
-
     $consulta = $conexion->prepare(
-        "SELECT idItemCarrito, cantidad
+        "SELECT items_carrito.idItemCarrito, items_carrito.cantidad,
+                productos.stock
          FROM items_carrito
-         WHERE idCarrito = ? AND idProducto = ?"
+         INNER JOIN productos
+            ON items_carrito.idProducto = productos.idProducto
+         WHERE items_carrito.idCarrito = ? AND items_carrito.idProducto = ?"
     );
-
     $consulta->execute([$idCarrito, $idProducto]);
-
     $item = $consulta->fetch(PDO::FETCH_ASSOC);
 
     if (!$item) {
@@ -123,39 +129,30 @@ function modificarCantidad($idProducto, $cambio) {
 
     $nuevaCantidad = $item["cantidad"] + $cambio;
 
+    if ($cambio > 0 && $nuevaCantidad > $item["stock"]) {
+        return;
+    }
+
     if ($nuevaCantidad <= 0) {
         eliminarProducto($idProducto);
     } else {
         $consulta = $conexion->prepare(
-            "UPDATE items_carrito
-             SET cantidad = ?
-             WHERE idItemCarrito = ?"
+            "UPDATE items_carrito SET cantidad = ? WHERE idItemCarrito = ?"
         );
-
-        $consulta->execute([
-            $nuevaCantidad,
-            $item["idItemCarrito"]
-        ]);
+        $consulta->execute([$nuevaCantidad, $item["idItemCarrito"]]);
     }
 }
 
-
 function eliminarProducto($idProducto) {
     global $conexion;
-
     $idProducto = (int) $idProducto;
-
     if ($idProducto <= 0) {
         return;
     }
-
     $idCarrito = obtenerOCrearCarrito();
-
     $consulta = $conexion->prepare(
-        "DELETE FROM items_carrito
-         WHERE idCarrito = ? AND idProducto = ?"
+        "DELETE FROM items_carrito WHERE idCarrito = ? AND idProducto = ?"
     );
-
     $consulta->execute([$idCarrito, $idProducto]);
 }
 

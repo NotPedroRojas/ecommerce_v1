@@ -1,220 +1,76 @@
 
 <?php
-
-require_once __DIR__ . "/../models/Categoria.php";
-
-$categoriasPadre = listarCategoriasPadre();
-
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+require_once __DIR__ . "/../models/catalogo/Categoria.php";
+$categoriasMenu = listarCategoriasPadre();
 ?>
-
 <header class="st-header">
-
     <nav class="st-navbar">
-
         <div class="st-logo">
-            <a href="/ecommerce/index.php" class="st-nombre">
-                SpaceTech
-            </a>
-
+            <a href="/ecommerce/index.php" class="st-nombre">SpaceTech</a>
             <a href="/ecommerce/index.php">
                 <img src="/ecommerce/assets/img/icono.png" alt="Logo de SpaceTech">
             </a>
         </div>
+        <form action="/ecommerce/views/catalogo/buscar.php"
+            method="GET"
+            class="input-group st-buscador">
 
+            <input
+                type="search"
+                name="q"
+                class="form-control"
+                placeholder="¿Qué producto estás buscando?"
+                aria-label="Buscar productos"
+                required
+            >
+
+            <button class="btn btn-primary" type="submit">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    fill="currentColor"
+                    viewBox="0 0 16 16">
+
+                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.099zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+
+                </svg>
+            </button>
+        </form>
         <div class="st-enlaces">
-
             <a href="/ecommerce/index.php">Inicio</a>
-
             <details class="st-menu">
-
                 <summary>Categorías</summary>
-
                 <div class="st-lista-categorias">
-
-                    <?php foreach ($categoriasPadre as $categoria) { ?>
-
+                    <?php foreach ($categoriasMenu as $categoriaMenu) { ?>
                         <details class="st-categoria">
-
-                            <summary>
-                                <?php echo htmlspecialchars($categoria["nombre"]); ?>
-                            </summary>
-
+                            <summary><?php echo htmlspecialchars($categoriaMenu["nombre"]); ?></summary>
                             <div class="st-subcategorias">
-
-                                <a href="/ecommerce/views/categorias.php?idCategoria=<?php echo $categoria['idCategoria']; ?>">
-                                    Ver todos los productos
-                                </a>
-
+                                <a href="/ecommerce/views/catalogo/categorias.php?idCategoria=<?php echo $categoriaMenu['idCategoria']; ?>">Ver todos los productos</a>
                                 <?php
-                                $subcategorias = listarSubcategorias(
-                                    $categoria["idCategoria"]
-                                );
+                                $subcategoriasMenu = listarSubcategorias($categoriaMenu["idCategoria"]);
+                                foreach ($subcategoriasMenu as $subcategoriaMenu) {
                                 ?>
-
-                                <?php foreach ($subcategorias as $subcategoria) { ?>
-
-                                    <a href="/ecommerce/views/categorias.php?idCategoria=<?php echo $subcategoria['idCategoria']; ?>">
-                                        <?php echo htmlspecialchars($subcategoria["nombre"]); ?>
-                                    </a>
-
+                                    <a href="/ecommerce/views/catalogo/categorias.php?idCategoria=<?php echo $subcategoriaMenu['idCategoria']; ?>"><?php echo htmlspecialchars($subcategoriaMenu["nombre"]); ?></a>
                                 <?php } ?>
-
                             </div>
-
                         </details>
-
                     <?php } ?>
-
                 </div>
-
             </details>
-
-            <a href="/ecommerce/views/carrito.php">Mi carrito</a>
-
-            <a href="/ecommerce/views/login.php">Iniciar sesión / Registrarse</a>
-
+            <a href="/ecommerce/views/carrito/index.php">Mi carrito</a>
+            <?php if (isset($_SESSION["idUsuario"])) { ?>
+                <a href="/ecommerce/views/usuario/miCuenta.php">Mi cuenta</a>
+                <?php if ($_SESSION["tipoUsuario"] == "administrador") { ?>
+                    <a href="/ecommerce/views/admin/index.php">Administración</a>
+                <?php } ?>
+                <a href="/ecommerce/controllers/usuario/LogoutController.php" class="st-cerrar-sesion">Cerrar sesión</a>
+            <?php } else { ?>
+                <a href="/ecommerce/views/usuario/login.php">Iniciar sesión</a>
+                <a href="/ecommerce/views/usuario/registro.php">Registrarse</a>
+            <?php } ?>
         </div>
-
     </nav>
-
 </header>
-
-<style>
-.st-header {
-    background-color: #212529;
-    position: relative;
-    z-index: 1000;
-}
-
-.st-navbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 25px;
-    padding: 15px 30px;
-}
-
-.st-logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
-}
-
-.st-logo a {
-    text-decoration: none;
-}
-
-.st-nombre {
-    color: white;
-    font-size: 24px;
-    font-weight: bold;
-}
-
-.st-logo img {
-    display: block;
-    width: 45px;
-    height: 45px;
-    object-fit: contain;
-}
-
-.st-enlaces {
-    display: flex;
-    align-items: center;
-    gap: 25px;
-}
-
-.st-enlaces > a,
-.st-menu > summary {
-    color: white;
-    text-decoration: none;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.st-menu {
-    position: relative;
-}
-
-.st-menu > summary,
-.st-categoria > summary {
-    list-style: none;
-    cursor: pointer;
-}
-
-.st-menu > summary::-webkit-details-marker,
-.st-categoria > summary::-webkit-details-marker {
-    display: none;
-}
-
-.st-menu > summary::after,
-.st-categoria > summary::after {
-    content: " ▼";
-    font-size: 10px;
-}
-
-.st-lista-categorias {
-    position: absolute;
-    top: calc(100% + 12px);
-    left: 0;
-    width: 260px;
-    max-height: 70vh;
-    overflow-y: auto;
-    padding: 8px;
-    background-color: white;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    box-sizing: border-box;
-}
-
-.st-categoria {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-}
-
-.st-categoria > summary {
-    color: #212529;
-    font-weight: bold;
-}
-
-.st-subcategorias {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch;
-    gap: 10px;
-    padding: 12px 0 4px 12px;
-}
-
-.st-subcategorias a {
-    display: block !important;
-    color: #495057;
-    text-decoration: none;
-    white-space: normal;
-    font-size: 14px;
-}
-
-.st-subcategorias a:hover {
-    color: #0d6efd;
-    text-decoration: underline;
-}
-
-@media (max-width: 900px) {
-    .st-navbar {
-        flex-direction: column;
-        gap: 15px;
-    }
-
-    .st-enlaces {
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 15px;
-    }
-}
-
-@media (max-width: 480px) {
-    .st-enlaces {
-        flex-direction: column;
-    }
-}
-</style>
